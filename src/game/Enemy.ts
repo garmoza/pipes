@@ -1,10 +1,10 @@
-import { GameObject, Position, Size } from "../types/game.types";
-import { Helpers } from "../utils/helpers";
+import { GameObject, Position, Size } from '../types/game.types';
+import { Helpers } from '../utils/helpers';
 
 export class Enemy implements GameObject {
   public position: Position;
   public size: Size = { width: 40, height: 40 };
-  public color: string = "#F44336";
+  public color: string = '#F44336';
   public speed: number;
 
   constructor(canvasWidth: number, level: number = 1) {
@@ -18,15 +18,10 @@ export class Enemy implements GameObject {
 
   public draw(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = this.color;
-    ctx.fillRect(
-      this.position.x,
-      this.position.y,
-      this.size.width,
-      this.size.height
-    );
+    ctx.fillRect(this.position.x, this.position.y, this.size.width, this.size.height);
 
     // Добавляем детали
-    ctx.fillStyle = "#B71C1C";
+    ctx.fillStyle = '#B71C1C';
     ctx.fillRect(
       this.position.x + 8,
       this.position.y + 8,
@@ -36,6 +31,7 @@ export class Enemy implements GameObject {
   }
 
   public update(deltaTime: number): void {
+    console.log(deltaTime);
     this.position.y += this.speed;
   }
 
