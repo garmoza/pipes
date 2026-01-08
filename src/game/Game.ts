@@ -1,166 +1,86 @@
-import { GameState } from '../types/game.types'
-import { Player } from './Player'
-import { Enemy } from './Enemy'
-import { Helpers } from '../utils/helpers'
+import { ScreenState, ScreenType } from './navigation/ScreenState'
 
 export class Game {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
-  private player: Player
-  private enemies: Enemy[] = []
-  private state: GameState
-  private lastTime: number = 0
-  private enemySpawnRate: number = 60 // кадры между появлением врагов
-  private enemySpawnCounter: number = 0
-  private keys: Set<string> = new Set()
+  private dpr: number
+
+  // Логический размер холста (в CSS-пикселях)
+  private logicalWidth: number
+  private logicalHeight: number
+
+  private screenState: ScreenState
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
-    this.ctx = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Failed to get 2D context')
+    this.ctx = ctx
 
-    // Устанавливаем размеры canvas
-    this.canvas.width = 800
-    this.canvas.height = 600
+    this.dpr = window.devicePixelRatio || 1
 
-    this.player = new Player(this.canvas.width, this.canvas.height)
-    this.state = {
-      score: 0,
-      isGameOver: false,
-      level: 1,
-    }
+    const rect = this.canvas.getBoundingClientRect()
 
-    this.setupEventListeners()
+    // Логический размер — это размер canvas в CSS-пикселях
+    this.logicalWidth = rect.width
+    this.logicalHeight = rect.height
+
+    // Инициализируем экраны
+    this.screenState = new ScreenState(this.ctx, this.logicalWidth, this.logicalHeight)
+
+    // Обработчики событий
+    this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this))
+    this.canvas.addEventListener('click', this.handleClick.bind(this))
+
+    // Перерисовка при изменении размера окна
+    window.addEventListener('resize', this.resize.bind(this))
+
+    this.resize()
   }
 
-  private setupEventListeners(): void {
-    document.addEventListener('keydown', e => {
-      this.keys.add(e.key.toLowerCase())
-    })
+  private handleClick(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect()
+    const logicalX = e.clientX - rect.left
+    const logicalY = e.clientY - rect.top
 
-    document.addEventListener('keyup', e => {
-      this.keys.delete(e.key.toLowerCase())
-    })
+    this.screenState.handleClick(logicalX, logicalY)
   }
 
-  private handleInput(): void {
-    if (this.keys.has('arrowleft') || this.keys.has('a')) {
-      this.player.move('left', this.canvas.width)
-    }
-    if (this.keys.has('arrowright') || this.keys.has('d')) {
-      this.player.move('right', this.canvas.width)
-    }
+  private handleMouseMove(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect()
+    // Координаты в пикселях CSS
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    this.screenState.handleMouseMove(x, y)
   }
 
-  private spawnEnemy(): void {
-    if (this.enemySpawnCounter >= this.enemySpawnRate) {
-      this.enemies.push(new Enemy(this.canvas.width, this.state.level))
-      this.enemySpawnCounter = 0
-      // Увеличиваем сложность
-      this.enemySpawnRate = Math.max(20, 60 - this.state.level * 5)
-    }
-    this.enemySpawnCounter++
+  private resize(): void {
+    const rect = this.canvas.getBoundingClientRect()
+
+    // Логический размер — это размер canvas в CSS-пикселях
+    this.logicalWidth = rect.width
+    this.logicalHeight = rect.height
+
+    // Физический размер — учитываем devicePixelRatio
+    this.canvas.width = this.logicalWidth * this.dpr
+    this.canvas.height = this.logicalHeight * this.dpr
+
+    // CSS-размер остаётся тем же (браузер сам его применяет, но вы можете явно задать)
+    this.canvas.style.width = this.logicalWidth + 'px'
+    this.canvas.style.height = this.logicalHeight + 'px'
+
+    // Масштабируем контекст под логические координаты
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
+
+    this.draw()
   }
 
-  private updateEnemies(deltaTime: number): void {
-    for (let i = this.enemies.length - 1; i >= 0; i--) {
-      const enemy = this.enemies[i]
-      enemy.update(deltaTime)
+  private draw(): void {
+    this.ctx.save()
 
-      // Проверка столкновений
-      if (
-        Helpers.checkCollision(this.player.position, this.player.size, enemy.position, enemy.size)
-      ) {
-        this.state.isGameOver = true
-        return
-      }
+    this.screenState.setCurrentScreen(ScreenType.START_MENU)
 
-      // Удаление вышедших за границы врагов
-      if (enemy.isOutOfBounds(this.canvas.height)) {
-        this.enemies.splice(i, 1)
-        this.state.score += 10
-
-        // Увеличиваем уровень каждые 100 очков
-        this.state.level = Math.floor(this.state.score / 100) + 1
-      }
-    }
-  }
-
-  private drawBackground(): void {
-    // Градиентный фон
-    const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height)
-    gradient.addColorStop(0, '#1a237e')
-    gradient.addColorStop(1, '#4a148c')
-    this.ctx.fillStyle = gradient
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-  }
-
-  private drawUI(): void {
-    this.ctx.fillStyle = 'white'
-    this.ctx.font = '20px Arial'
-    this.ctx.fillText(`Score: ${this.state.score}`, 10, 30)
-    this.ctx.fillText(`Level: ${this.state.level}`, 10, 60)
-
-    if (this.state.isGameOver) {
-      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-
-      this.ctx.fillStyle = 'white'
-      this.ctx.font = '48px Arial'
-      this.ctx.textAlign = 'center'
-      this.ctx.fillText('Game Over!', this.canvas.width / 2, this.canvas.height / 2 - 50)
-      this.ctx.font = '24px Arial'
-      this.ctx.fillText(
-        `Final Score: ${this.state.score}`,
-        this.canvas.width / 2,
-        this.canvas.height / 2
-      )
-      this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50)
-      this.ctx.textAlign = 'left'
-    }
-  }
-
-  private gameLoop(currentTime: number): void {
-    const deltaTime = (currentTime - this.lastTime) / 16 // Нормализация времени
-    this.lastTime = currentTime
-
-    // Очистка canvas
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
-
-    if (!this.state.isGameOver) {
-      this.drawBackground()
-      this.handleInput()
-      this.spawnEnemy()
-      this.updateEnemies(deltaTime)
-
-      // Отрисовка игровых объектов
-      this.player.draw(this.ctx)
-      this.enemies.forEach(enemy => enemy.draw(this.ctx))
-    }
-
-    this.drawUI()
-
-    // Перезапуск игры
-    if (this.state.isGameOver && (this.keys.has('r') || this.keys.has('R'))) {
-      this.restart()
-    }
-
-    requestAnimationFrame(time => this.gameLoop(time))
-  }
-
-  private restart(): void {
-    this.player = new Player(this.canvas.width, this.canvas.height)
-    this.enemies = []
-    this.state = {
-      score: 0,
-      isGameOver: false,
-      level: 1,
-    }
-    this.enemySpawnCounter = 0
-    this.enemySpawnRate = 60
-    this.keys.clear()
-  }
-
-  public start(): void {
-    this.gameLoop(0)
+    this.ctx.restore()
   }
 }

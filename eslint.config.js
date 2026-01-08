@@ -19,6 +19,7 @@ export default [
         CanvasRenderingContext2D: 'readonly',
         HTMLCanvasElement: 'readonly',
         requestAnimationFrame: 'readonly',
+        MouseEvent: 'readonly',
         // Добавьте другие по мере необходимости
       },
     },

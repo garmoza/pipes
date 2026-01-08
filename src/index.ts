@@ -9,6 +9,5 @@ document.addEventListener('DOMContentLoaded', () => {
     return
   }
 
-  const game = new Game(canvas)
-  game.start()
+  new Game(canvas)
 })
